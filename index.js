@@ -1,41 +1,43 @@
 const express = require('express');
 const app = express();
-const path = require('path');
-const axios = require('axios');
+const { default: makeWASocket, useMultiFileAuthState, delay } = require("@whiskeysockets/baileys");
+const pino = require("pino");
 
-// Home page routing
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Pairing Logic Route
 app.get('/pair', async (req, res) => {
-  let num = req.query.number;
-  if (!num) return res.status(400).send("Commander, number missing!");
+    let num = req.query.number;
+    if (!num) return res.send("Provide a number! (e.g., ?number=91...)");
 
-  try {
-    // Ithu ninte bot-te official pairing API-ilekku number ayakkum
-    // Arslan-MD default pairing backend logic
-    res.send(`
-      <html>
-        <head><title>Cyber Dragon Pairing</title></head>
-        <body style="background: #000; color: #0f0; font-family: monospace; padding: 20px;">
-          <h2>🐲 Mission: Generate Pairing Code</h2>
-          <p>Commander, Request sent for: ${num}</p>
-          <hr>
-          <p id="status">Connecting to WhatsApp Servers... Please wait...</p>
-          <script>
-            setTimeout(() => {
-              document.getElementById('status').innerHTML = "<b>Check your WhatsApp for the 8-digit code!</b>";
-            }, 3000);
-          </script>
-        </body>
-      </html>
-    `);
-  } catch (err) {
-    res.status(500).send("Error: " + err.message);
-  }
+    const { state, saveCreds } = await useMultiFileAuthState(`./auth`);
+    
+    try {
+        const conn = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            logger: pino({ level: "silent" })
+        });
+
+        if (!conn.authState.creds.registered) {
+            await delay(1500);
+            num = num.replace(/[^0-9]/g, '');
+            const code = await conn.requestPairingCode(num);
+
+            // 🚀 THE MAGIC: Ippo screen-il direct aayi code varum!
+            res.send(`
+                <body style="background-color:black;color:lime;font-family:monospace;text-align:center;padding-top:50px;">
+                    <h1 style="text-shadow: 0 0 10px lime;">🐲 CYBER DRAGON PAIRING 🐲</h1>
+                    <hr style="border: 1px solid #333; width: 80%;">
+                    <h2 style="color:white;">Your 8-Digit Code is:</h2>
+                    <div style="font-size:60px; font-weight:bold; background:#111; display:inline-block; padding:30px; border-radius:15px; border:3px solid lime; box-shadow: 0 0 20px rgba(0,255,0,0.5); margin: 20px 0;">
+                        ${code}
+                    </div>
+                    <p style="color:yellow; font-size:18px;">Commander, enter this code in WhatsApp > Linked Devices!</p>
+                    <p style="color:gray;">Session ID will be sent to your WhatsApp after linking.</p>
+                </body>
+            `);
+        }
+    } catch (err) {
+        res.send("Error: " + err.message);
+    }
 });
 
-module.exports = app;
-// 
+app.listen(3000, () => console.log("Server started on port 3000"));
