@@ -7,15 +7,15 @@ app.get('/pair', async (req, res) => {
     let num = req.query.number;
     if (!num) return res.send("Provide a number! (e.g., ?number=91...)");
 
-    // Auth state setup
-    const { state, saveCreds } = await useMultiFileAuthState(`./auth`);
+    // 🚀 VERCEL FIX: State storage /tmp/ folder-ilekku maatti
+    const { state, saveCreds } = await useMultiFileAuthState('/tmp/auth');
     
     try {
         const conn = makeWASocket({
             auth: state,
             printQRInTerminal: false,
             logger: pino({ level: "silent" }),
-            browser: Browsers.macOS("Desktop") // Connect aakan ithu nirbandhamanu
+            browser: Browsers.macOS("Desktop")
         });
 
         if (!conn.authState.creds.registered) {
@@ -23,7 +23,7 @@ app.get('/pair', async (req, res) => {
             num = num.replace(/[^0-9]/g, '');
             const code = await conn.requestPairingCode(num);
 
-            // 🚀 THE MAGIC: Browser screen-il direct aayi code display cheyyunnu
+            // ✨ THE MAGIC: Hacker Style Browser UI
             res.send(`
                 <body style="background-color:black;color:lime;font-family:monospace;text-align:center;padding-top:50px;">
                     <h1 style="text-shadow: 0 0 10px lime;">🐲 CYBER DRAGON PAIRING 🐲</h1>
@@ -37,12 +37,15 @@ app.get('/pair', async (req, res) => {
                 </body>
             `);
         }
+        
+        conn.ev.on('creds.update', saveCreds);
+
     } catch (err) {
         console.log(err);
         res.status(500).send("Error: " + err.message);
     }
 });
 
-// Vercel-inu vendi ulla port setup
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log("Server started on port " + PORT));
+
